@@ -46,11 +46,11 @@ def delete_test_graphs_sync():
                 try:
                     graph = client.select_graph(graph_name)
                     graph.delete()
-                    print(f"Deleted graph: {graph_name}")
+                    logger.info("Deleted graph: %s", graph_name)
                 except Exception as e:
-                    print(f"Could not delete {graph_name}: {e}")
-    except Exception as e:
-        print(f"FalkorDB cleanup error: {e}")
+                    logger.warning("Could not delete %s: %s", graph_name, e)
+    except Exception:
+        logger.exception("FalkorDB cleanup error")
 
 
 async def delete_test_graphs():

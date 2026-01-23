@@ -88,8 +88,14 @@ def create_graph_engine(
         )
 
     elif graph_database_provider == "falkordb":
-        if not graph_database_url:
-            raise EnvironmentError("Missing required FalkorDB URL (GRAPH_DATABASE_URL).")
+        import os
+
+        falkordb_host = os.environ.get("FALKORDB_HOST")
+        # Allow either graph_database_url or FALKORDB_HOST env var
+        if not graph_database_url and not falkordb_host:
+            raise EnvironmentError(
+                "Missing required FalkorDB URL (GRAPH_DATABASE_URL or FALKORDB_HOST env var)."
+            )
 
         try:
             from falkordb import FalkorDB  # noqa: F401
@@ -101,7 +107,7 @@ def create_graph_engine(
         from .falkordb.adapter import FalkorDBAdapter
 
         return FalkorDBAdapter(
-            graph_database_url=graph_database_url,
+            graph_database_url=graph_database_url or falkordb_host or "",
             graph_database_port=graph_database_port or 6379,
             graph_database_password=graph_database_password or None,
             graph_database_name=graph_database_name or "CogneeGraph",

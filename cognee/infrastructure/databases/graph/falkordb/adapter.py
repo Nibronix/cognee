@@ -30,6 +30,26 @@ def _sanitize_graph_name(raw: Optional[str]) -> Optional[str]:
     return raw.replace(" ", "_").replace("'", "").replace("-", "_")
 
 
+def _sanitize_identifier(name: str) -> str:
+    """Sanitize an identifier for safe use in Cypher queries.
+
+    Validates that the identifier matches safe patterns and escapes backticks.
+    Raises ValueError if the identifier contains invalid characters.
+    """
+    import re
+
+    if not name:
+        raise ValueError("Identifier cannot be empty")
+    # Allow alphanumeric, underscores, and spaces (spaces will be escaped)
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_ ]*$", name):
+        raise ValueError(
+            f"Invalid identifier: {name}. Must start with letter/underscore and contain only alphanumeric, underscores, or spaces."
+        )
+    # Escape backticks by doubling them and wrap in backticks
+    escaped = name.replace("`", "``")
+    return f"`{escaped}`"
+
+
 class FalkorDBAdapter(GraphDBInterface):
     """
     FalkorDB graph database adapter implementing GraphDBInterface.
@@ -123,7 +143,7 @@ class FalkorDBAdapter(GraphDBInterface):
 
         graph = self.client.select_graph(graph_name)
 
-        # Create indices; ignore "already exists" errors
+        # Create indices; ignore "already exists" errors, re-raise others
         for q in (
             f"CREATE INDEX FOR (n:{BASE_LABEL}) ON (n.id)",
             f"CREATE INDEX FOR (n:{BASE_LABEL}) ON (n.updated_at)",
@@ -134,6 +154,8 @@ class FalkorDBAdapter(GraphDBInterface):
                 msg = str(e).lower()
                 if "already indexed" in msg or "already exists" in msg:
                     continue
+                logger.exception("Failed to create index on graph %s with query %s", graph_name, q)
+                raise
         self._graphs_initialized.add(graph_name)
 
     async def _ensure_graph_initialized(self, graph_name: str) -> None:
@@ -198,8 +220,9 @@ class FalkorDBAdapter(GraphDBInterface):
                 return True
             count_val = res[0].get("count", 0)
             return int(count_val) == 0
-        except Exception:
-            return True
+        except Exception as e:
+            logger.warning("Error checking if graph is empty: %s", e)
+            raise
 
     def _sanitize_props(self, props: Dict[str, Any]) -> Dict[str, Any]:
         """Sanitize property values for FalkorDB compatibility."""
@@ -237,7 +260,8 @@ class FalkorDBAdapter(GraphDBInterface):
             node_id = str(node)
             label = "Node"
 
-        # logger.warning(f"DEBUG: add_node id={node_id} label={label}")
+        # Sanitize label for safe Cypher interpolation
+        safe_label = _sanitize_identifier(label)
 
         properties = properties or {}
         if "type" not in properties:
@@ -248,7 +272,7 @@ class FalkorDBAdapter(GraphDBInterface):
             f"MERGE (n:`{BASE_LABEL}` {{id: $id}}) "
             f"ON CREATE SET n += $props "
             f"ON MATCH SET n += $props "
-            f"SET n:`{label}` "
+            f"SET n:{safe_label} "
             f"RETURN n"
         )
         await self.query(query, {"id": node_id, "props": props})
@@ -268,10 +292,12 @@ class FalkorDBAdapter(GraphDBInterface):
         properties: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Add an edge between two nodes."""
+        # Sanitize relationship name for safe Cypher interpolation
+        safe_rel = _sanitize_identifier(relationship_name)
         props = self._sanitize_props(properties or {})
         query = (
             f"MATCH (a:`{BASE_LABEL}` {{id: $source_id}}), (b:`{BASE_LABEL}` {{id: $target_id}}) "
-            f"MERGE (a)-[r:`{relationship_name}`]->(b) "
+            f"MERGE (a)-[r:{safe_rel}]->(b) "
             f"SET r += $props"
         )
         await self.query(

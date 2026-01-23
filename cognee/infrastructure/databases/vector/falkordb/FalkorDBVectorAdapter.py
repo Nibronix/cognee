@@ -67,14 +67,14 @@ class FalkorDBVectorAdapter(VectorDBInterface):
         Args:
             url: FalkorDB host URL
             port: FalkorDB port (default: 6379)
-            api_key: Optional password for authentication
+            api_key: Optional authentication token
             embedding_engine: Engine for generating embeddings
             graph_name: Default graph name (default: 'CogneeGraph')
 
         Environment Variables (preferred - unified config):
             FALKORDB_HOST: FalkorDB host (takes precedence over url)
             FALKORDB_PORT: FalkorDB port (takes precedence over port)
-            FALKORDB_PASSWORD: FalkorDB password (takes precedence over api_key)
+            FALKORDB_PASSWORD: FalkorDB auth token (takes precedence over api_key)
             FALKORDB_GRAPH_NAME: Graph name (takes precedence over graph_name)
         """
         import os
@@ -87,7 +87,7 @@ class FalkorDBVectorAdapter(VectorDBInterface):
             else (raw_host or "localhost")
         )
         self.port = int(os.getenv("FALKORDB_PORT") or port or 6379)
-        self.password = os.getenv("FALKORDB_PASSWORD") or api_key
+        self.auth_token = os.getenv("FALKORDB_PASSWORD") or api_key
         self._default_graph_name = os.getenv("FALKORDB_GRAPH_NAME") or graph_name or "CogneeGraph"
         self.embedding_engine = embedding_engine
 
@@ -116,8 +116,8 @@ class FalkorDBVectorAdapter(VectorDBInterface):
             )
 
         kwargs: Dict[str, Any] = {"host": self.host, "port": self.port}
-        if self.password:
-            kwargs["password"] = self.password
+        if self.auth_token:
+            kwargs["password"] = self.auth_token
         self.client = FalkorDB(**kwargs)
 
     async def _ensure_connected(self) -> None:
@@ -163,8 +163,10 @@ class FalkorDBVectorAdapter(VectorDBInterface):
         return data
 
     async def has_collection(self, collection_name: str) -> bool:
-        """Check if a collection exists (always returns False to force creation)."""
-        return False
+        """Check if a collection exists by checking local cache."""
+        label = collection_name.replace("-", "_")
+        graph_name = self._get_graph_name_from_ctx()
+        return (graph_name, label) in self._indices_created
 
     async def create_collection(self, collection_name: str, payload_schema: Optional[Any] = None):
         """Create a vector index for the collection."""
@@ -172,8 +174,8 @@ class FalkorDBVectorAdapter(VectorDBInterface):
         vector_size = self.embedding_engine.get_vector_size() if self.embedding_engine else 384
 
         graph_name = self._get_graph_name_from_ctx()
-        logger.warning(
-            "DEBUG CREATE_COLLECTION: graph=%s collection=%s vector_size=%s engine=%s",
+        logger.debug(
+            "CREATE_COLLECTION: graph=%s collection=%s vector_size=%s engine=%s",
             graph_name,
             label,
             vector_size,
@@ -204,8 +206,8 @@ class FalkorDBVectorAdapter(VectorDBInterface):
     async def create_data_points(self, collection_name: str, data_points: List[DataPoint]):
         """Insert data points with their embeddings."""
         label = collection_name.replace("-", "_")
-        logger.warning(
-            "DEBUG CREATE_DATA_POINTS: graph=%s collection=%s count=%s engine=%s",
+        logger.debug(
+            "CREATE_DATA_POINTS: graph=%s collection=%s count=%s engine=%s",
             self._get_graph_name_from_ctx(),
             label,
             len(data_points),
@@ -306,14 +308,18 @@ class FalkorDBVectorAdapter(VectorDBInterface):
         )
 
         try:
-            # logger.warning(f"DEBUG SEARCH: graph={graph_name} collection={label} limit={limit} emb_len={len(emb_list)}")
-            logger.warning(
-                f"DEBUG SEARCH CALL: graph={self._get_graph_name_from_ctx()} collection={label} emb_len={len(emb_list)} engine={type(self.embedding_engine).__name__ if self.embedding_engine else 'None'} query={query}"
+            logger.debug(
+                "SEARCH CALL: graph=%s collection=%s emb_len=%s engine=%s query=%s",
+                self._get_graph_name_from_ctx(),
+                label,
+                len(emb_list),
+                type(self.embedding_engine).__name__ if self.embedding_engine else "None",
+                query,
             )
             results = await self._query(query, {"emb": emb_list})
         except Exception as e:
             msg = str(e)
-            logger.warning(f"DEBUG SEARCH EXCEPTION: {msg} for query={query}")
+            logger.debug("SEARCH EXCEPTION: %s for query=%s", msg, query)
             if "Invalid arguments for procedure 'db.idx.vector.queryNodes'" in msg:
                 logger.warning(
                     "Vector queryNodes failed for graph=%s collection=%s; returning empty.",
@@ -359,8 +365,15 @@ class FalkorDBVectorAdapter(VectorDBInterface):
             # Drop all indices
             indices_res = await self._query("CALL db.indexes()")
             for idx_info in indices_res:
+                # Defensive validation: ensure expected structure
+                if not isinstance(idx_info, (list, tuple)) or len(idx_info) < 2:
+                    logger.debug("Skipping malformed index info: %s", idx_info)
+                    continue
                 idx_name = idx_info[0]
                 properties = idx_info[1]
+                if not isinstance(properties, (list, tuple)) or len(properties) < 1:
+                    logger.debug("Skipping index with no properties: %s", idx_name)
+                    continue
                 prop_name = properties[0]
                 try:
                     # Try dropping as standard index
@@ -370,7 +383,7 @@ class FalkorDBVectorAdapter(VectorDBInterface):
             # Delete all nodes
             await self._query("MATCH (n) DETACH DELETE n")
         except Exception as e:
-            logger.warning(f"Error during FalkorDB prune: {e}")
+            logger.warning("Error during FalkorDB prune: %s", e)
         self._indices_created.clear()
 
     async def embed_data(self, data: List[str]) -> List[List[float]]:
