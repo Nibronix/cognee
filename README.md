@@ -1,3 +1,19 @@
+> **Fork Notice:** This is a fork of [topoteretes/cognee](https://github.com/topoteretes/cognee) extended for multi-agent RAG with isolated graph partitions.
+
+---
+
+## Cognee Multi-Agent RAG Fork
+
+**Stack:** FalkorDB · LangGraph · MCP · Docker &nbsp;|&nbsp; Oct 2025 – Dec 2025
+
+This fork extends Cognee with three core capabilities for production multi-agent systems:
+
+- **FalkorDB graph adapter with dynamic routing** — Partitions graph memory per agent/session, enforcing strict data isolation across agentic LLM systems so no agent can read another's context.
+- **MCP server over isolated graph partitions** — Exposes each partition as a distinct MCP tool, enabling stateless agents to execute hybrid retrievals against their own namespace while completely avoiding context leakage.
+- **Hybrid graph-vector retrieval in a LangGraph state machine** — Combines FalkorDB graph traversal with semantic vector search to enable multi-hop reasoning across documents without context bleed between agents.
+
+---
+
 <div align="center">
   <a href="https://github.com/topoteretes/cognee">
     <img src="https://raw.githubusercontent.com/topoteretes/cognee/refs/heads/dev/assets/cognee-logo-transparent.png" alt="Cognee Logo" height="60">
