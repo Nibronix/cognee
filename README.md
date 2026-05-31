@@ -4,7 +4,7 @@
 
 ## Cognee Multi-Agent RAG Fork
 
-**Stack:** FalkorDB · LangGraph · MCP · Docker &nbsp;|&nbsp; Oct 2025 – Dec 2025
+**Stack:** FalkorDB · LangGraph · MCP · Docker
 
 This fork extends Cognee with three core capabilities for production multi-agent systems:
 
