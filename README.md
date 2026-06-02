@@ -1,3 +1,19 @@
+> **Fork Notice:** This is a fork of [topoteretes/cognee](https://github.com/topoteretes/cognee) extended for multi-agent RAG with isolated graph partitions.
+
+---
+
+## Cognee Multi-Agent RAG Fork
+
+**Stack:** FalkorDB · LangGraph · MCP · Docker
+
+This fork extends Cognee with three core capabilities for production multi-agent systems:
+
+- **FalkorDB graph adapter with dynamic routing** — Partitions graph memory per agent/session, enforcing strict data isolation across agentic LLM systems so no agent can read another's context.
+- **MCP server over isolated graph partitions** — Exposes each partition as a distinct MCP tool, enabling stateless agents to execute hybrid retrievals against their own namespace while completely avoiding context leakage.
+- **Hybrid graph-vector retrieval in a LangGraph state machine** — Combines FalkorDB graph traversal with semantic vector search to enable multi-hop reasoning across documents without context bleed between agents.
+
+---
+
 <div align="center">
   <a href="https://github.com/topoteretes/cognee">
     <img src="https://raw.githubusercontent.com/topoteretes/cognee/refs/heads/dev/assets/cognee-logo-transparent.png" alt="Cognee Logo" height="60">
@@ -63,16 +79,19 @@ Use your data to build personalized and dynamic memory for AI Agents. Cognee let
 </div>
 </div>
 
+
+
+
 ## About Cognee
 
-Cognee is an open-source tool and platform that transforms your raw data into persistent and dynamic AI memory for Agents. It combines vector search with graph databases to make your documents both searchable by meaning and connected by relationships.
+Cognee is an open-source tool and platform that transforms your raw data into persistent and dynamic AI memory for Agents. It combines vector search with graph databases to make your documents both searchable by meaning and connected by relationships. 
+Cognee offers default memory creation and search which we describe bellow. But with Cognee you can build your own!
 
-You can use Cognee in two ways:
 
-1. [Self-host Cognee Open Source](https://docs.cognee.ai/getting-started/installation), which stores all data locally by default.
-2. [Connect to Cognee Cloud](https://platform.cognee.ai/), and get the same OSS stack on managed infrastructure for easier development and productionization.
+:star: _Help us reach more developers and grow the cognee community. Star this repo!_
 
-### Cognee Open Source (self-hosted):
+
+### Cognee Open Source:
 
 - Interconnects any type of data — including past conversations, files, images, and audio transcriptions
 - Replaces traditional RAG systems with a unified memory layer built on graphs and vectors
@@ -80,11 +99,6 @@ You can use Cognee in two ways:
 - Provides Pythonic data pipelines for ingestion from 30+ data sources
 - Offers high customizability through user-defined tasks, modular pipelines, and built-in search endpoints
 
-### Cognee Cloud (managed):
-- Hosted web UI dashboard
-- Automatic version updates
-- Resource usage analytics
-- GDPR compliant, enterprise-grade security
 
 ## Basic Usage & Feature Guide
 
@@ -119,7 +133,7 @@ To integrate other LLM providers, see our [LLM Provider Documentation](https://d
 
 ### Step 3: Run the Pipeline
 
-Cognee will take your documents, generate a knowledge graph from them and then query the graph based on combined relationships.
+Cognee will take your documents, generate a knowledge graph from them and then query the graph based on combined relationships. 
 
 Now, run a minimal pipeline:
 
@@ -158,7 +172,7 @@ As you can see, the output is generated from the document we previously stored i
   Cognee turns documents into AI memory.
 ```
 
-### Use the Cognee CLI
+### Use the Cognee CLI 
 
 As an alternative, you can get started with these essential commands:
 
